@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>US Population & Immigration: A Narrative</title>
+    <!-- Tailwind CSS CDN for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts - Inter for clean typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Base styles for the body and overall container */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Light background for the page */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh; /* Full viewport height */
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 1rem; /* Rounded corners for the main content box */
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1); /* Soft shadow for depth */
+            padding: 2rem;
+            max-width: 960px; /* Max width to keep content readable */
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem; /* Spacing between sections */
+        }
+
+        /* Chart specific styles */
+        .chart-container {
+            width: 100%;
+            height: 450px; /* Fixed height for the SVG area */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative; /* Needed for absolute positioning of tooltip */
+        }
+        svg {
+            background-color: #ffffff;
+            border-radius: 0.75rem; /* Rounded corners for the SVG background */
+            overflow: visible; /* Allow tooltips/annotations to extend beyond SVG bounds */
+        }
+
+        /* D3 Axis styling */
+        .axis path,
+        .axis line {
+            fill: none;
+            stroke: #cbd5e1; /* Light gray lines for axes */
+            shape-rendering: crispEdges; /* Ensures sharp lines */
+        }
+        .axis text {
+            font-size: 0.875rem; /* Small text for axis labels */
+            fill: #475569; /* Darker gray for readability */
+        }
+
+        /* D3 Line styling */
+        .line {
+            fill: none;
+            stroke-width: 3px;
+            transition: stroke 0.5s ease-in-out, opacity 0.5s ease-in-out; /* Smooth transitions for color and visibility */
+        }
+
+        /* Annotation box styling */
+        .annotation {
+            background-color: #e2e8f0; /* Light blue-gray background */
+            border-left: 4px solid #3b82f6; /* Prominent blue left border */
+            padding: 1rem;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            color: #1e293b; /* Dark text for contrast */
+            margin-top: 1rem;
+            min-height: 80px; /* Ensures consistent height across narrative steps */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        /* Tooltip styling */
+        .tooltip {
+            position: absolute;
+            text-align: left; /* Align text left for multi-line information */
+            padding: 0.5rem 0.75rem;
+            background: #1e293b; /* Dark background */
+            color: white;
+            border-radius: 0.5rem;
+            pointer-events: none; /* Allows mouse events to pass through */
+            opacity: 0; /* Hidden by default */
+            transition: opacity 0.2s ease-in-out; /* Smooth fade in/out */
+            font-size: 0.875rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+            z-index: 100; /* Ensures tooltip is on top */
+        }
+
+        /* Interactive controls section styling */
+        .interactive-controls {
+            display: none; /* Hidden by default, revealed by narrative */
+            flex-direction: column;
+            gap: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e2e8f0; /* Separator line */
+        }
+
+        /* Button group styling */
+        .button-group {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+        button {
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
+            font-weight: 600; /* Semi-bold text */
+            cursor: pointer;
+            transition: all 0.2s ease-in-out; /* Smooth hover effects */
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+        }
+        button.primary {
+            background-image: linear-gradient(to right, #3b82f6, #2563eb); /* Blue gradient for primary action */
+            color: white;
+            border: none;
+        }
+        button.primary:hover {
+            background-image: linear-gradient(to right, #2563eb, #1d4ed8); /* Darker gradient on hover */
+            transform: translateY(-2px); /* Slight lift effect */
+        }
+        button.secondary {
+            background-color: #e2e8f0; /* Light gray for secondary action */
+            color: #1e293b;
+            border: 1px solid #cbd5e1;
+        }
+        button.secondary:hover {
+            background-color: #cbd5e1; /* Darker gray on hover */
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-3xl font-bold text-center text-gray-800">US Population & Immigration: A Narrative</h1>
+
+        <!-- Area for narrative text annotations -->
+        <div class="annotation" id="narrative-text"></div>
+
+        <!-- Chart container for the D3 SVG -->
+        <div class="chart-container">
+            <svg id="population-chart"></svg>
+            <div class="tooltip" id="chart-tooltip"></div>
+        </div>
+
+        <!-- Navigation buttons -->
+        <div class="button-group">
+            <button id="next-button" class="primary">Next</button>
+            <button id="restart-button" class="secondary hidden">Restart Tour</button>
+        </div>
+
+        <!-- Interactive controls section, initially hidden -->
+        <div class="interactive-controls" id="interactive-controls">
+            <h2 class="text-xl font-semibold text-gray-700">Explore Data</h2>
+            <div class="flex items-center gap-2">
+                <input type="checkbox" id="toggle-immigration" class="form-checkbox h-5 w-5 text-blue-600 rounded focus:ring-blue-500" checked>
+                <label for="toggle-immigration" class="text-gray-700 font-medium">Show Immigration Data</label>
+            </div>
+            <p class="text-sm text-gray-600 mt-2">Hover over the chart to see exact values. Click and drag to zoom.</p>
+        </div>
+    </div>
+
+    <!-- D3.js CDN - Version 7 -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+
+    <script>
+        // Ensure the script runs only after the entire DOM is loaded
+        window.onload = function() {
+            // --- 1. Mock Data Generation ---
+            // Generates synthetic data for US population (in millions) and immigration (in thousands)
+            // from 1900 to 2023. This simulates realistic trends.
+            const startYear = 1900;
+            const endYear = 2023;
+            const data = Array.from({ length: endYear - startYear + 1 }, (_, i) => {
+                const year = startYear + i;
+                let population; // Represents population in millions
+                let immigrants; // Represents immigrants in thousands
+
+                // Simulate population growth trends over different periods
+                if (year < 1950) {
+                    population = 76 + (year - 1900) * 1.2 + Math.random() * 5;
+                    // Simulate early 20th century immigration, including dips for WWI/Great Depression
+                    immigrants = 500 + (Math.sin((year - 1900) / 10) * 200) - ((year > 1915 && year < 1930) ? 400 : 0);
+                } else if (year < 1980) {
+                    population = 150 + (year - 1950) * 2.5 + Math.random() * 8;
+                    // Simulate post-WWII immigration rise
+                    immigrants = 250 + (year - 1950) * 10 + Math.random() * 100;
+                } else {
+                    population = 220 + (year - 1980) * 3.5 + Math.random() * 10;
+                    // Simulate accelerated immigration in recent decades
+                    immigrants = 500 + (year - 1980) * 20 + Math.random() * 200;
+                }
+
+                // Further refine the Great Depression/WWII immigration dip
+                if (year >= 1930 && year <= 1945) {
+                    immigrants = Math.max(50, immigrants - (year - 1930) * 50);
+                }
+
+                return {
+                    year: year,
+                    population: parseFloat(population.toFixed(1)), // Keep one decimal for population
+                    immigrants: parseFloat(Math.max(0, immigrants).toFixed(0)) // Round to nearest whole number for immigrants, ensure non-negative
+                };
+            });
+
+            // --- 2. Chart Dimensions and SVG Setup ---
+            // Define margins for the chart to provide space for axes and labels
+            const margin = { top: 20, right: 60, bottom: 40, left: 60 }; // Increased right margin for immigration axis
+            // Calculate dynamic width and height based on container size
+            let width = document.querySelector('.chart-container').clientWidth - margin.left - margin.right;
+            let height = document.querySelector('.chart-container').clientHeight - margin.top - margin.bottom;
+
+            // Select the SVG element and append a group element for the chart content
+            const svg = d3.select("#population-chart")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`); // Apply margin as a translation
+
+            // --- 3. Scales ---
+            // X-scale for years (linear scale)
+            const xScale = d3.scaleLinear()
+                .domain(d3.extent(data, d => d.year)) // Domain from min to max year in data
+                .range([0, width]); // Maps to the width of the chart area
+
+            // Y-scale for Population (left axis) - linear scale
+            const yScalePopulation = d3.scaleLinear()
+                .domain([0, d3.max(data, d => d.population) * 1.1]) // Domain from 0 to 110% of max population
+                .range([height, 0]); // Maps to the height of the chart area (inverted for SVG)
+
+            // Y-scale for Immigration (right axis) - linear scale
+            const yScaleImmigration = d3.scaleLinear()
+                .domain([0, d3.max(data, d => d.immigrants) * 1.2]) // Domain from 0 to 120% of max immigrants
+                .range([height, 0]); // Maps to the height of the chart area (inverted for SVG)
+
+            // --- 4. Axes ---
+            // X-axis (bottom)
+            const xAxis = d3.axisBottom(xScale).tickFormat(d3.format("d")); // Format ticks as integers
+            const xAxisGroup = svg.append("g")
+                .attr("class", "axis x-axis")
+                .attr("transform", `translate(0,${height})`) // Position at the bottom
+                .call(xAxis);
+
+            // Left Y-axis for Population
+            const yAxisPopulation = d3.axisLeft(yScalePopulation).tickFormat(d => `${d}M`); // Format ticks with 'M' for millions
+            const yAxisPopulationGroup = svg.append("g")
+                .attr("class", "axis y-axis-population")
+                .call(yAxisPopulation);
+
+            // Right Y-axis for Immigration
+            const yAxisImmigration = d3.axisRight(yScaleImmigration).tickFormat(d => `${d}K`); // Format ticks with 'K' for thousands
+            const yAxisImmigrationGroup = svg.append("g")
+                .attr("class", "axis y-axis-immigration")
+                .attr("transform", `translate(${width},0)`) // Position at the right edge
+                .call(yAxisImmigration);
+
+            // Add Y-axis labels
+            yAxisPopulationGroup.append("text")
+                .attr("fill", "#475569") // Color for the label
+                .attr("transform", "rotate(-90)") // Rotate for vertical text
+                .attr("y", -margin.left + 15) // Position left of the axis
+                .attr("x", -height / 2) // Center vertically
+                .attr("dy", "1em") // Adjust vertical position
+                .attr("text-anchor", "middle") // Center text horizontally
+                .text("Population (Millions)");
+
+            yAxisImmigrationGroup.append("text")
+                .attr("fill", "#475569")
+                .attr("transform", "rotate(90)") // Rotate for vertical text
+                .attr("y", margin.right - 15) // Position right of the axis
+                .attr("x", height / 2) // Center vertically
+                .attr("dy", "1em")
+                .attr("text-anchor", "middle")
+                .text("Immigrants (Thousands)");
+
+            // --- 5. Line Generators ---
+            // D3 line generator for the population data
+            const linePopulation = d3.line()
+                .x(d => xScale(d.year))
+                .y(d => yScalePopulation(d.population));
+
+            // D3 line generator for the immigration data
+            const lineImmigration = d3.line()
+                .x(d => xScale(d.year))
+                .y(d => yScaleImmigration(d.immigrants));
+
+            // --- 6. Paths (Data Lines) ---
+            // Path for population data, initially visible
+            const pathPopulation = svg.append("path")
+                .datum(data) // Bind the entire data array
+                .attr("class", "line population-line")
+                .attr("d", linePopulation) // Generate the path data
+                .attr("stroke", "#3b82f6"); // Blue color for population
+
+            // Path for immigration data, initially hidden
+            const pathImmigration = svg.append("path")
+                .datum(data)
+                .attr("class", "line immigration-line")
+                .attr("d", lineImmigration)
+                .attr("stroke", "#22c55e") // Green color for immigration
+                .style("opacity", 0); // Start with 0 opacity (hidden)
+
+            // --- 7. Tooltip and Focus Elements ---
+            // Select the tooltip div
+            const tooltip = d3.select("#chart-tooltip");
+
+            // Focus circle for population line
+            const focusPopulation = svg.append("g")
+                .attr("class", "focus-population")
+                .style("display", "none"); // Hidden by default
+
+            focusPopulation.append("circle")
+                .attr("r", 5) // Radius of the circle
+                .attr("fill", "#3b82f6"); // Match population line color
+
+            // Focus circle for immigration line
+            const focusImmigration = svg.append("g")
+                .attr("class", "focus-immigration")
+                .style("display", "none"); // Hidden by default
+
+            focusImmigration.append("circle")
+                .attr("r", 5)
+                .attr("fill", "#22c55e"); // Match immigration line color
+
+            // Overlay rectangle for capturing mouse events (hover and zoom)
+            const overlay = svg.append("rect")
+                .attr("class", "overlay")
+                .attr("width", width)
+                .attr("height", height)
+                .style("fill", "none")
+                .style("pointer-events", "all") // Allows it to capture mouse events
+                .on("mouseover", () => {
+                    // Show focus circles when mouse enters chart area
+                    focusPopulation.style("display", null);
+                    // Only show immigration focus if the line is visible
+                    if (d3.select("#toggle-immigration").property("checked")) {
+                        focusImmigration.style("display", null);
+                    }
+                })
+                .on("mouseout", () => {
+                    // Hide focus circles and tooltip when mouse leaves chart area
+                    focusPopulation.style("display", "none");
+                    focusImmigration.style("display", "none");
+                    tooltip.style("opacity", 0);
+                })
+                .on("mousemove", mousemove); // Attach mousemove event handler
+
+            // Mousemove event handler for tooltips and focus circles
+            function mousemove(event) {
+                // Determine the year corresponding to the mouse's X position
+                const bisect = d3.bisector(d => d.year).left; // Bisector to find nearest data point
+                const x0 = xScale.invert(d3.pointer(event)[0]); // Invert X coordinate to get year
+                const i = bisect(data, x0, 1); // Find index of data point
+                const d0 = data[i - 1]; // Data point before
+                const d1 = data[i]; // Data point after
+                // Select the closer data point
+                const d = x0 - d0.year > d1.year - x0 ? d1 : d0;
+
+                // Update position of focus circles
+                focusPopulation.attr("transform", `translate(${xScale(d.year)},${yScalePopulation(d.population)})`);
+                focusImmigration.attr("transform", `translate(${xScale(d.year)},${yScaleImmigration(d.immigrants)})`);
+
+                // Update tooltip content
+                let tooltipText = `Year: ${d.year}<br>Population: ${d.population}M`;
+                if (d3.select("#toggle-immigration").property("checked")) {
+                    tooltipText += `<br>Immigrants: ${d.immigrants}K`;
+                }
+
+                // Position and show tooltip
+                tooltip.html(tooltipText)
+                    .style("left", `${event.pageX + 10}px`) // Offset from mouse pointer
+                    .style("top", `${event.pageY - 28}px`)
+                    .style("opacity", 1); // Make tooltip visible
+            }
+
+            // --- 8. Zoom Behavior ---
+            // D3 zoom behavior
+            const zoom = d3.zoom()
+                .scaleExtent([1, 10]) // Allow zooming in up to 10x
+                .extent([[0, 0], [width, height]]) // Define the zoomable area
+                .on("zoom", zoomed); // Attach zoom event handler
+
+            // Zoom event handler
+            function zoomed(event) {
+                // Create a new X scale based on the current zoom transform
+                const newXScale = event.transform.rescaleX(xScale);
+                // Update the X-axis
+                xAxisGroup.call(d3.axisBottom(newXScale).tickFormat(d3.format("d")));
+                // Redraw both lines using the new X scale
+                pathPopulation.attr("d", linePopulation.x(d => newXScale(d.year)));
+                pathImmigration.attr("d", lineImmigration.x(d => newXScale(d.year)));
+            }
+
+            // Apply zoom behavior to the overlay rectangle
+            overlay.call(zoom);
+
+            // --- 9. Narrative Logic (Interactive Slideshow) ---
+            let currentStep = 0; // Parameter to track the current narrative step
+
+            // Define the narrative steps, their content, and associated visualization state
+            const narrativeSteps = [
+                {
+                    text: "The Growth of a Nation: Understanding US Population and Immigration. Click 'Next' to begin.",
+                    dataEndYear: 1900, // Only show data up to 1900 initially
+                    showImmigration: false, // Immigration line is hidden
+                    showControls: false // Interactive controls are hidden
+                },
+                {
+                    text: "Early 20th Century: Population growth driven by high birth rates and European immigration. Hover over the chart to see details.",
+                    dataEndYear: 1950, // Extend data to 1950
+                    showImmigration: true, // Immigration line becomes visible
+                    showControls: false // Controls still hidden
+                },
+                {
+                    text: "Post-WWII Boom and Changing Immigration Patterns. Notice the dip in immigration during the Great Depression and WWII, followed by a rise.",
+                    dataEndYear: 1980, // Extend data to 1980
+                    showImmigration: true,
+                    showControls: false
+                },
+                {
+                    text: "Recent Decades: Immigration has become a significant driver of population growth. Use the toggle below to show/hide immigration data.",
+                    dataEndYear: 2023, // Show full data range
+                    showImmigration: true,
+                    showControls: true // Interactive controls become visible
+                },
+                {
+                    text: "You can now freely explore the data by hovering, zooming, and toggling immigration data. Click 'Restart Tour' to go back.",
+                    dataEndYear: 2023,
+                    showImmigration: true,
+                    showControls: true
+                }
+            ];
+
+            // Select DOM elements for narrative control
+            const narrativeTextDiv = d3.select("#narrative-text");
+            const nextButton = d3.select("#next-button");
+            const restartButton = d3.select("#restart-button");
+            const interactiveControls = d3.select("#interactive-controls");
+            const toggleImmigration = d3.select("#toggle-immigration");
+
+            // Function to update the visualization based on the current narrative step
+            function updateNarrative() {
+                const step = narrativeSteps[currentStep]; // Get the current step's parameters
+                narrativeTextDiv.text(step.text); // Update the narrative text annotation
+
+                // Filter data to show only up to the current step's end year
+                const filteredData = data.filter(d => d.year <= step.dataEndYear);
+
+                // Update X-axis domain to reflect the currently displayed data range
+                xScale.domain([d3.min(filteredData, d => d.year), d3.max(filteredData, d => d.year)]);
+                xAxisGroup.transition().duration(750).call(xAxis); // Smooth transition for X-axis
+
+                // Update population line path with filtered data and transition
+                pathPopulation.datum(filteredData)
+                    .transition()
+                    .duration(750)
+                    .attr("d", linePopulation)
+                    .attr("stroke", "#3b82f6"); // Keep population line blue
+
+                // Update immigration line path and control its opacity based on 'showImmigration'
+                pathImmigration.datum(filteredData)
+                    .transition()
+                    .duration(750)
+                    .attr("d", lineImmigration)
+                    .attr("stroke", "#22c55e") // Keep immigration line green
+                    .style("opacity", step.showImmigration ? 1 : 0); // Show or hide
+
+                // Control visibility of interactive controls section
+                interactiveControls.style("display", step.showControls ? "flex" : "none");
+                // Sync the immigration toggle checkbox state with the narrative step's setting
+                toggleImmigration.property("checked", step.showImmigration);
+
+                // Manage visibility of Next/Restart buttons
+                if (currentStep === narrativeSteps.length - 1) {
+                    nextButton.classed("hidden", true);
+                    restartButton.classed("hidden", false);
+                } else {
+                    nextButton.classed("hidden", false);
+                    restartButton.classed("hidden", true);
+                }
+            }
+
+            // --- 10. Triggers (Event Listeners) ---
+            // "Next" button click handler
+            nextButton.on("click", () => {
+                if (currentStep < narrativeSteps.length - 1) {
+                    currentStep++; // Advance to next step
+                    updateNarrative(); // Update visualization
+                }
+            });
+
+            // "Restart Tour" button click handler
+            restartButton.on("click", () => {
+                currentStep = 0; // Go back to the first step
+                updateNarrative(); // Update visualization
+            });
+
+            // Immigration data toggle checkbox handler
+            toggleImmigration.on("change", function() {
+                const checked = d3.select(this).property("checked"); // Get checkbox state
+                // Transition opacity of immigration line
+                pathImmigration.transition().duration(500).style("opacity", checked ? 1 : 0);
+                // Toggle visibility of immigration focus circle
+                focusImmigration.style("display", checked ? null : "none");
+
+                // If the checkbox is unchecked, hide the tooltip immediately
+                if (!checked) {
+                    tooltip.style("opacity", 0);
+                }
+            });
+
+            // --- 11. Responsiveness on Window Resize ---
+            // Adjust chart dimensions and redraw on window resize
+            window.addEventListener('resize', () => {
+                // Recalculate dimensions
+                width = document.querySelector('.chart-container').clientWidth - margin.left - margin.right;
+                height = document.querySelector('.chart-container').clientHeight - margin.top - margin.bottom;
+
+                // Update SVG dimensions
+                svg.attr("width", width + margin.left + margin.right)
+                   .attr("height", height + margin.top + margin.bottom);
+
+                // Update scale ranges
+                xScale.range([0, width]);
+                yScalePopulation.range([height, 0]);
+                yScaleImmigration.range([height, 0]);
+
+                // Update axis positions and redraw
+                xAxisGroup.attr("transform", `translate(0,${height})`).call(xAxis);
+                yAxisPopulationGroup.call(yAxisPopulation);
+                yAxisImmigrationGroup.attr("transform", `translate(${width},0)`).call(yAxisImmigration);
+
+                // Redraw lines with new scales
+                pathPopulation.attr("d", linePopulation);
+                pathImmigration.attr("d", lineImmigration);
+
+                // Update overlay dimensions and zoom extent
+                overlay.attr("width", width)
+                       .attr("height", height)
+                       .call(zoom.extent([[0, 0], [width, height]]));
+            });
+
+            // --- Initial Render ---
+            // Call updateNarrative to set up the first scene when the page loads
+            updateNarrative();
+        };
+    </script>
+</body>
+</html>
+
