@@ -152,7 +152,7 @@
         }
         .wicket-dot {
             r: 4px;
-            fill: red;
+            stroke: black;
             cursor: pointer;
         }
         .annotation.note-title {
@@ -313,32 +313,20 @@
                 <p class="slide-text">Winning is everything. This chart reveals the top 5 teams with the most victories. Hover over a bar to see the exact win count and titles won.</p>
             `);
 
-            // --- Calculate Championship Wins ---
-            const finalMatchesBySeason = d3.rollup(
-                matchesData,
-                v => d3.max(v, d => d.id),
-                d => d.season
-            );
-
+            const finalMatchesBySeason = d3.rollup(matchesData, v => d3.max(v, d => d.id), d => d.season);
             const championshipWinners = new Map();
             finalMatchesBySeason.forEach(matchId => {
                 const finalMatch = matchesData.find(d => d.id === matchId);
                 if (finalMatch && finalMatch.winner) {
-                    championshipWinners.set(
-                        finalMatch.winner,
-                        (championshipWinners.get(finalMatch.winner) || 0) + 1
-                    );
+                    championshipWinners.set(finalMatch.winner, (championshipWinners.get(finalMatch.winner) || 0) + 1);
                 }
             });
 
-            // --- Process Team Data ---
             const winsPerTeam = d3.rollup(matchesData, v => v.length, d => d.winner);
             winsPerTeam.delete(""); winsPerTeam.delete(null);
             
             const teamData = Array.from(winsPerTeam, ([key, value]) => ({
-                team: key,
-                wins: value,
-                championships: championshipWinners.get(key) || 0
+                team: key, wins: value, championships: championshipWinners.get(key) || 0
             })).sort((a, b) => d3.descending(a.wins, b.wins)).slice(0, 5);
             
             const svg = content.append("svg").attr("width", width + margin.left + margin.right).attr("height", height + margin.top + margin.bottom)
@@ -351,8 +339,6 @@
             const y = d3.scaleLinear().domain([0, d3.max(teamData, d => d.wins)]).range([height, 0]);
             svg.append("g").call(d3.axisLeft(y));
 
-            const color = d3.scaleOrdinal(d3.schemeCategory10).domain(teamData.map(d => d.team));
-
             const mouseover = (event, d) => tooltip.style("opacity", 1);
             const mousemove = (event, d) => {
                 const [posX, posY] = d3.pointer(event, d3.select('#visualization-container').node());
@@ -362,7 +348,7 @@
 
             svg.selectAll("rect").data(teamData).join("rect").attr("class", "bar").attr("x", d => x(d.team))
                 .attr("y", y(0)).attr("width", x.bandwidth()).attr("height", 0)
-                .attr("fill", d => color(d.team)) // Use color scale
+                .attr("fill", "#0059b3") // Reverted to single color
                 .on("mouseover", mouseover).on("mousemove", mousemove).on("mouseleave", mouseleave)
                 .transition().duration(800).attr("y", d => y(d.wins)).attr("height", d => height - y(d.wins));
         }
@@ -416,18 +402,16 @@
         }
 
         function displayScorecard(matchId) {
-            const scorecardContainer = d3.select("#scorecard-container").html(""); // Clear previous
+            const scorecardContainer = d3.select("#scorecard-container").html("");
             const matchDetails = matchesData.find(d => d.id === matchId);
             const matchDeliveries = deliveriesData.filter(d => d.match_id === matchId);
 
-            // --- Text Scorecard ---
             let scorecardHTML = `<h3>Scorecard: ${matchDetails.team1} vs ${matchDetails.team2}</h3><p><strong>Result:</strong> ${matchDetails.winner} won. <strong>Player of the Match:</strong> ${matchDetails.player_of_match}</p><hr>`;
             scorecardContainer.append("div").html(scorecardHTML);
 
-            // --- Line Chart Visualization ---
             const chartMargin = {top: 40, right: 120, bottom: 40, left: 50};
             const chartWidth = 800 - chartMargin.left - chartMargin.right;
-            const chartHeight = 300 - chartMargin.top - chartMargin.bottom;
+            const chartHeight = 350 - chartMargin.top - chartMargin.bottom;
 
             const svg = scorecardContainer.append("svg")
                 .attr("width", chartWidth + chartMargin.left + chartMargin.right)
@@ -473,7 +457,8 @@
             const legendItems = legendGroup.selectAll(".legend-item")
                 .data(inningsData)
                 .join("g")
-                .attr("class", "legend-item");
+                .attr("class", "legend-item")
+                .attr("transform", (d, i) => `translate(0, ${i * 40})`); // Use fixed offset to prevent overlap
 
             legendItems.append("circle")
                 .attr("cx", 0)
@@ -489,13 +474,6 @@
                 .attr("alignment-baseline", "middle")
                 .call(wrap, 100);
 
-            let yOffset = 0;
-            legendItems.each(function() {
-                const g = d3.select(this);
-                g.attr("transform", `translate(0, ${yOffset})`);
-                yOffset += g.node().getBBox().height + 5;
-            });
-
             inningsData.forEach((inning, i) => {
                 const line = d3.line().x(d => x(d.ball)).y(d => y(d.runs));
                 svg.append("path").datum(inning.progression).attr("class", "line").attr("d", line).style("stroke", color(i));
@@ -503,6 +481,7 @@
                 svg.selectAll(`.wicket-dot-inning-${i}`).data(inning.progression.filter(d => d.wicket))
                     .enter().append("circle").attr("class", `wicket-dot wicket-dot-inning-${i}`)
                     .attr("cx", d => x(d.ball)).attr("cy", d => y(d.runs))
+                    .style("fill", color(i))
                     .on("mouseover", (event, d) => {
                         tooltip.style("opacity", 1).html(`Wicket: ${d.wicket.player}<br>(${d.wicket.kind})`);
                     })
