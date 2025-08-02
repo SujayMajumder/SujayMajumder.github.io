@@ -150,14 +150,13 @@
             fill: none;
             stroke-width: 2px;
         }
+        .wicket-dot {
+            r: 4px;
+            fill: red;
+            cursor: pointer;
+        }
         .annotation.note-title {
             font-weight: bold;
-        }
-        .annotation-note-label {
-            font-size: 10px;
-        }
-        .annotation-connector {
-            stroke-width: 1px;
         }
     </style>
 </head>
@@ -314,20 +313,32 @@
                 <p class="slide-text">Winning is everything. This chart reveals the top 5 teams with the most victories. Hover over a bar to see the exact win count and titles won.</p>
             `);
 
-            const finalMatchesBySeason = d3.rollup(matchesData, v => d3.max(v, d => d.id), d => d.season);
+            // --- Calculate Championship Wins ---
+            const finalMatchesBySeason = d3.rollup(
+                matchesData,
+                v => d3.max(v, d => d.id),
+                d => d.season
+            );
+
             const championshipWinners = new Map();
             finalMatchesBySeason.forEach(matchId => {
                 const finalMatch = matchesData.find(d => d.id === matchId);
                 if (finalMatch && finalMatch.winner) {
-                    championshipWinners.set(finalMatch.winner, (championshipWinners.get(finalMatch.winner) || 0) + 1);
+                    championshipWinners.set(
+                        finalMatch.winner,
+                        (championshipWinners.get(finalMatch.winner) || 0) + 1
+                    );
                 }
             });
 
+            // --- Process Team Data ---
             const winsPerTeam = d3.rollup(matchesData, v => v.length, d => d.winner);
             winsPerTeam.delete(""); winsPerTeam.delete(null);
             
             const teamData = Array.from(winsPerTeam, ([key, value]) => ({
-                team: key, wins: value, championships: championshipWinners.get(key) || 0
+                team: key,
+                wins: value,
+                championships: championshipWinners.get(key) || 0
             })).sort((a, b) => d3.descending(a.wins, b.wins)).slice(0, 5);
             
             const svg = content.append("svg").attr("width", width + margin.left + margin.right).attr("height", height + margin.top + margin.bottom)
@@ -350,7 +361,8 @@
             const mouseleave = () => tooltip.style("opacity", 0);
 
             svg.selectAll("rect").data(teamData).join("rect").attr("class", "bar").attr("x", d => x(d.team))
-                .attr("y", y(0)).attr("width", x.bandwidth()).attr("height", 0).attr("fill", d => color(d.team))
+                .attr("y", y(0)).attr("width", x.bandwidth()).attr("height", 0)
+                .attr("fill", d => color(d.team)) // Use color scale
                 .on("mouseover", mouseover).on("mousemove", mousemove).on("mouseleave", mouseleave)
                 .transition().duration(800).attr("y", d => y(d.wins)).attr("height", d => height - y(d.wins));
         }
@@ -404,16 +416,18 @@
         }
 
         function displayScorecard(matchId) {
-            const scorecardContainer = d3.select("#scorecard-container").html("");
+            const scorecardContainer = d3.select("#scorecard-container").html(""); // Clear previous
             const matchDetails = matchesData.find(d => d.id === matchId);
             const matchDeliveries = deliveriesData.filter(d => d.match_id === matchId);
 
+            // --- Text Scorecard ---
             let scorecardHTML = `<h3>Scorecard: ${matchDetails.team1} vs ${matchDetails.team2}</h3><p><strong>Result:</strong> ${matchDetails.winner} won. <strong>Player of the Match:</strong> ${matchDetails.player_of_match}</p><hr>`;
             scorecardContainer.append("div").html(scorecardHTML);
 
-            const chartMargin = {top: 40, right: 20, bottom: 40, left: 50};
+            // --- Line Chart Visualization ---
+            const chartMargin = {top: 40, right: 120, bottom: 40, left: 50};
             const chartWidth = 800 - chartMargin.left - chartMargin.right;
-            const chartHeight = 350 - chartMargin.top - chartMargin.bottom;
+            const chartHeight = 300 - chartMargin.top - chartMargin.bottom;
 
             const svg = scorecardContainer.append("svg")
                 .attr("width", chartWidth + chartMargin.left + chartMargin.right)
@@ -424,17 +438,22 @@
             const inningsData = [];
             const innings = d3.group(matchDeliveries, d => d.inning);
             let maxRuns = 0;
+            let finalScores = [];
 
-            innings.forEach((inningDeliveries) => {
+            innings.forEach((inningDeliveries, inningNum) => {
                 let cumulativeRuns = 0;
                 let ballCounter = 0;
+                let wicketCounter = 0;
                 const runProgression = inningDeliveries.map(d => {
                     cumulativeRuns += d.total_runs;
                     ballCounter++;
+                    if (d.player_dismissed) wicketCounter++;
                     if(cumulativeRuns > maxRuns) maxRuns = cumulativeRuns;
                     return { ball: ballCounter, runs: cumulativeRuns, wicket: d.player_dismissed ? { player: d.player_dismissed, kind: d.dismissal_kind } : null };
                 });
-                inningsData.push({ team: inningDeliveries[0].batting_team, progression: runProgression });
+                const finalScore = runProgression[runProgression.length - 1];
+                finalScores.push({ ...finalScore, wickets: wicketCounter, team: inningDeliveries[0].batting_team });
+                inningsData.push({inning: inningNum, team: inningDeliveries[0].batting_team, progression: runProgression});
             });
 
             const x = d3.scaleLinear().domain([0, d3.max(inningsData, d => d.progression.length)]).range([0, chartWidth]);
@@ -447,10 +466,29 @@
 
             const color = d3.scaleOrdinal(d3.schemeCategory10);
             
-            const legendGroup = svg.append("g").attr("class", "legend").attr("transform", "translate(10, 0)");
-            const legendItems = legendGroup.selectAll(".legend-item").data(inningsData).join("g").attr("class", "legend-item");
-            legendItems.append("circle").attr("cx", 0).attr("cy", 10).attr("r", 6).style("fill", (d, i) => color(i));
-            legendItems.append("text").attr("x", 10).attr("y", 10).text(d => d.team).style("font-size", "12px").attr("alignment-baseline", "middle").call(wrap, 100);
+            const legendGroup = svg.append("g")
+                .attr("class", "legend")
+                .attr("transform", "translate(10, 0)");
+
+            const legendItems = legendGroup.selectAll(".legend-item")
+                .data(inningsData)
+                .join("g")
+                .attr("class", "legend-item");
+
+            legendItems.append("circle")
+                .attr("cx", 0)
+                .attr("cy", 10)
+                .attr("r", 6)
+                .style("fill", (d, i) => color(i));
+
+            legendItems.append("text")
+                .attr("x", 10)
+                .attr("y", 10)
+                .text(d => d.team)
+                .style("font-size", "12px")
+                .attr("alignment-baseline", "middle")
+                .call(wrap, 100);
+
             let yOffset = 0;
             legendItems.each(function() {
                 const g = d3.select(this);
@@ -458,29 +496,30 @@
                 yOffset += g.node().getBBox().height + 5;
             });
 
-            const allWickets = [];
             inningsData.forEach((inning, i) => {
                 const line = d3.line().x(d => x(d.ball)).y(d => y(d.runs));
                 svg.append("path").datum(inning.progression).attr("class", "line").attr("d", line).style("stroke", color(i));
-                
-                inning.progression.forEach(d => {
-                    if (d.wicket) {
-                        allWickets.push({ ...d, color: color(i) });
-                    }
-                });
+
+                svg.selectAll(`.wicket-dot-inning-${i}`).data(inning.progression.filter(d => d.wicket))
+                    .enter().append("circle").attr("class", `wicket-dot wicket-dot-inning-${i}`)
+                    .attr("cx", d => x(d.ball)).attr("cy", d => y(d.runs))
+                    .on("mouseover", (event, d) => {
+                        tooltip.style("opacity", 1).html(`Wicket: ${d.wicket.player}<br>(${d.wicket.kind})`);
+                    })
+                    .on("mousemove", (event) => {
+                        const [posX, posY] = d3.pointer(event, d3.select('#visualization-container').node());
+                        tooltip.style("left", (posX + 15) + "px").style("top", (posY) + "px");
+                    })
+                    .on("mouseleave", () => tooltip.style("opacity", 0));
             });
 
-            const type = d3.annotationCallout;
-            const wicketAnnotations = allWickets.map((wicket, i) => ({
-                note: { label: `${wicket.wicket.player} (${wicket.wicket.kind})`, title: "Wicket", wrap: 150 },
-                x: x(wicket.ball),
-                y: y(wicket.runs),
-                dy: (i % 2 === 0 ? 1 : -1) * (Math.floor(i/2) * 15 + 30),
-                dx: (i % 2 === 0 ? 1 : -1) * 25,
-                color: wicket.color
+            const type = d3.annotationLabel;
+            const annotations = finalScores.map((score, i) => ({
+                note: { label: `${score.runs}/${score.wickets}`, title: score.team, wrap: 150 },
+                x: x(score.ball), y: y(score.runs), dy: i === 0 ? -20 : 20, dx: 20
             }));
 
-            const makeAnnotations = d3.annotation().type(type).annotations(wicketAnnotations);
+            const makeAnnotations = d3.annotation().type(type).annotations(annotations);
             svg.append("g").attr("class", "annotation-group").call(makeAnnotations);
         }
 
