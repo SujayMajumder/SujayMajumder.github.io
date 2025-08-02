@@ -463,7 +463,7 @@
             
             const legendGroup = svg.append("g")
                 .attr("class", "legend")
-                .attr("transform", `translate(${vizWidth + 20}, 20)`);
+                .attr("transform", `translate(${vizWidth + 20}, ${vizHeight - 40})`);
 
             const legendItems = legendGroup.selectAll(".legend-item")
                 .data(inningsData)
@@ -495,7 +495,7 @@
             const type = d3.annotationLabel;
             const annotations = finalScores.map((score, i) => ({
                 note: { label: `${score.runs}/${score.wickets}`, title: score.team, wrap: 150 },
-                x: x(score.ball), y: y(score.runs), dy: i === 0 ? -20 : 20, dx: 20
+                x: x(score.ball), y: y(score.runs), dy: i === 0 ? -30 : 30, dx: -30
             }));
 
             const makeAnnotations = d3.annotation().type(type).annotations(annotations);
