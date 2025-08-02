@@ -422,7 +422,7 @@
             let scorecardHTML = `<h3>Scorecard: ${matchDetails.team1} vs ${matchDetails.team2}</h3><p><strong>Result:</strong> ${matchDetails.winner} won. <strong>Player of the Match:</strong> ${matchDetails.player_of_match}</p><hr>`;
             scorecardContainer.append("div").html(scorecardHTML);
 
-            const vizMargin = {top: 20, right: 140, bottom: 60, left: 50};
+            const vizMargin = {top: 20, right: 160, bottom: 60, left: 50};
             const vizWidth = 800 - vizMargin.left - vizMargin.right;
             const vizHeight = 350 - vizMargin.top - vizMargin.bottom;
 
@@ -452,7 +452,7 @@
             });
 
             const x = d3.scaleLinear().domain([0, 120]).range([0, vizWidth]); // 120 balls = 20 overs
-            svg.append("g").attr("transform", `translate(0, ${vizHeight})`).call(d3.axisBottom(x).ticks(10).tickFormat(d => d/6));
+            svg.append("g").attr("transform", `translate(0, ${vizHeight})`).call(d3.axisBottom(x).tickValues(d3.range(0, 121, 12)).tickFormat(d => d/6));
             svg.append("text").attr("class", "axis-label").attr("text-anchor", "middle").attr("x", vizWidth / 2).attr("y", vizHeight + vizMargin.bottom - 20).text("Over");
             
             const y = d3.scaleLinear().domain([0, maxRuns * 1.1]).range([vizHeight, 0]);
@@ -501,7 +501,7 @@
             const type = d3.annotationLabel;
             const annotations = finalScores.map((score, i) => ({
                 note: { label: `${score.runs}/${score.wickets}`, title: score.team, wrap: 150 },
-                x: x(score.ball), y: y(score.runs), dy: i === 0 ? -30 : 30, dx: 0
+                x: x(score.ball), y: y(score.runs), dy: i === 0 ? -30 : 30, dx: -30
             }));
 
             const makeAnnotations = d3.annotation().type(type).annotations(annotations);
