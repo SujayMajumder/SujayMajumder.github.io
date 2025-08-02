@@ -237,9 +237,10 @@
                 tooltip.style("opacity", 1);
             };
             const mousemove = (event, d) => {
+                const [posX, posY] = d3.pointer(event, d3.select('#visualization-container').node());
                 tooltip.html(`Season: ${d.season}<br>Matches: ${d.matches}`)
-                    .style("left", (event.pageX + 10) + "px")
-                    .style("top", (event.pageY - 28) + "px");
+                    .style("left", (posX + 15) + "px")
+                    .style("top", (posY) + "px");
             };
             const mouseleave = (event, d) => {
                 tooltip.style("opacity", 0);
@@ -263,18 +264,6 @@
             
             /*
             // --- Annotation Removed as requested ---
-            const peakSeason = seasonData.reduce((prev, current) => (prev.matches > current.matches) ? prev : current);
-            const type = d3.annotationLabel;
-            const annotations = [{
-                note: { label: `The most matches (${peakSeason.matches}) were played in ${peakSeason.season}.`, title: "Peak Season", wrap: 150 },
-                x: x(peakSeason.season) + x.bandwidth() / 2,
-                y: y(peakSeason.matches),
-                dy: -20,
-                dx: 0
-            }];
-
-            const makeAnnotations = d3.annotation().type(type).annotations(annotations);
-            svg.append("g").attr("class", "annotation-group").call(makeAnnotations);
             */
         }
 
@@ -307,9 +296,10 @@
 
             const mouseover = (event, d) => tooltip.style("opacity", 1);
             const mousemove = (event, d) => {
+                const [posX, posY] = d3.pointer(event, d3.select('#visualization-container').node());
                 tooltip.html(`${d.team}<br>Wins: ${d.wins}`)
-                    .style("left", (event.pageX + 10) + "px")
-                    .style("top", (event.pageY - 28) + "px");
+                    .style("left", (posX + 15) + "px")
+                    .style("top", (posY) + "px");
             };
             const mouseleave = (event, d) => tooltip.style("opacity", 0);
 
@@ -331,18 +321,6 @@
 
             /*
             // --- Annotation Removed as requested ---
-            const topTeam = teamData[0];
-            const type = d3.annotationLabel; 
-            const annotations = [{
-                note: { label: `${topTeam.team} leads with ${topTeam.wins} wins.`, title: "Top Team", wrap: 150 },
-                x: x(topTeam.team) + x.bandwidth() / 2,
-                y: y(topTeam.wins),
-                dy: -50,
-                dx: 0
-            }];
-
-            const makeAnnotations = d3.annotation().type(type).annotations(annotations);
-            svg.append("g").attr("class", "annotation-group").call(makeAnnotations);
             */
         }
 
