@@ -124,6 +124,8 @@
         #match-list-container {
             width: 100%;
             margin-top: 15px;
+            max-height: 200px;
+            overflow-y: auto;
         }
         .match-item {
             padding: 10px;
@@ -143,6 +145,15 @@
             border-radius: 8px;
             text-align: left;
             width: 100%;
+        }
+        .line {
+            fill: none;
+            stroke-width: 2px;
+        }
+        .wicket-dot {
+            r: 4px;
+            fill: red;
+            cursor: pointer;
         }
     </style>
 </head>
@@ -331,7 +342,7 @@
             const content = d3.select("#slide-content");
             content.html(`
                 <h2>Match Explorer</h2>
-                <p class="slide-text">Select a year and a team to see their match results and scorecards.</p>
+                <p class="slide-text">Select a year and a team to see their match results. Click a match to see the scorecard and run progression chart.</p>
                 <div id="explorer-controls">
                     <select id="year-select"><option>Select a Year</option></select>
                     <select id="team-select" disabled><option>Select a Team</option></select>
@@ -342,12 +353,7 @@
 
             const seasons = [...new Set(matchesData.map(d => d.season))].sort(d3.descending);
             const yearSelect = d3.select("#year-select");
-            yearSelect.selectAll("option.year-option")
-                .data(seasons)
-                .enter()
-                .append("option")
-                .attr("class", "year-option")
-                .text(d => d);
+            yearSelect.selectAll("option.year-option").data(seasons).enter().append("option").attr("class", "year-option").text(d => d);
 
             yearSelect.on("change", function() {
                 const selectedYear = d3.select(this).property("value");
@@ -359,21 +365,10 @@
                     teamSelect.property("disabled", true).html("<option>Select a Team</option>");
                     return;
                 }
-
                 const teamsInSeason = new Set();
-                matchesData.filter(d => d.season == selectedYear).forEach(d => {
-                    teamsInSeason.add(d.team1);
-                    teamsInSeason.add(d.team2);
-                });
-
-                teamSelect.property("disabled", false)
-                    .html("<option>Select a Team</option>")
-                    .selectAll("option.team-option")
-                    .data([...teamsInSeason].sort())
-                    .enter()
-                    .append("option")
-                    .attr("class", "team-option")
-                    .text(d => d);
+                matchesData.filter(d => d.season == selectedYear).forEach(d => { teamsInSeason.add(d.team1); teamsInSeason.add(d.team2); });
+                teamSelect.property("disabled", false).html("<option>Select a Team</option>").selectAll("option.team-option")
+                    .data([...teamsInSeason].sort()).enter().append("option").attr("class", "team-option").text(d => d);
             });
 
             d3.select("#team-select").on("change", function() {
@@ -382,56 +377,97 @@
                 const matchListContainer = d3.select("#match-list-container");
                 d3.select("#scorecard-container").html("");
 
-                if (!selectedTeam || selectedTeam === "Select a Team") {
-                    matchListContainer.html("");
-                    return;
-                }
+                if (!selectedTeam || selectedTeam === "Select a Team") { matchListContainer.html(""); return; }
 
                 const teamMatches = matchesData.filter(d => d.season == selectedYear && (d.team1 === selectedTeam || d.team2 === selectedTeam));
-
-                matchListContainer.selectAll("div.match-item")
-                    .data(teamMatches)
-                    .join("div")
-                    .attr("class", "match-item")
-                    .attr("data-match-id", d => d.id)
+                matchListContainer.selectAll("div.match-item").data(teamMatches).join("div").attr("class", "match-item")
                     .html(d => `${d.team1} vs ${d.team2} <br><small>${d.winner} won by ${d.win_by_runs > 0 ? `${d.win_by_runs} runs` : `${d.win_by_wickets} wickets`}</small>`)
-                    .on("click", function(event, d) {
-                        displayScorecard(d.id);
-                    });
+                    .on("click", (event, d) => displayScorecard(d.id));
             });
         }
 
         function displayScorecard(matchId) {
-            const scorecardContainer = d3.select("#scorecard-container");
+            const scorecardContainer = d3.select("#scorecard-container").html(""); // Clear previous
             const matchDetails = matchesData.find(d => d.id === matchId);
             const matchDeliveries = deliveriesData.filter(d => d.match_id === matchId);
 
-            let scorecardHTML = `<h3>Scorecard: ${matchDetails.team1} vs ${matchDetails.team2}</h3>`;
-            scorecardHTML += `<p><strong>Venue:</strong> ${matchDetails.venue} | <strong>Date:</strong> ${new Date(matchDetails.date).toLocaleDateString()}</p>`;
-            scorecardHTML += `<p><strong>Result:</strong> ${matchDetails.winner} won by ${matchDetails.win_by_runs > 0 ? `${matchDetails.win_by_runs} runs` : `${matchDetails.win_by_wickets} wickets`}. <strong>Player of the Match:</strong> ${matchDetails.player_of_match}</p><hr>`;
+            // --- Text Scorecard ---
+            let scorecardHTML = `<h3>Scorecard: ${matchDetails.team1} vs ${matchDetails.team2}</h3><p><strong>Result:</strong> ${matchDetails.winner} won. <strong>Player of the Match:</strong> ${matchDetails.player_of_match}</p><hr>`;
+            scorecardContainer.append("div").html(scorecardHTML);
 
+            // --- Line Chart Visualization ---
+            const chartMargin = {top: 20, right: 20, bottom: 30, left: 40};
+            const chartWidth = 800 - chartMargin.left - chartMargin.right;
+            const chartHeight = 300 - chartMargin.top - chartMargin.bottom;
+
+            const svg = scorecardContainer.append("svg")
+                .attr("width", chartWidth + chartMargin.left + chartMargin.right)
+                .attr("height", chartHeight + chartMargin.top + chartMargin.bottom)
+                .append("g")
+                .attr("transform", `translate(${chartMargin.left},${chartMargin.top})`);
+
+            const inningsData = [];
             const innings = d3.group(matchDeliveries, d => d.inning);
-            
+            let maxRuns = 0;
+
             innings.forEach((inningDeliveries, inningNum) => {
-                const battingTeam = inningDeliveries[0].batting_team;
-                const bowlingTeam = inningDeliveries[0].bowling_team;
-
-                const totalRuns = d3.sum(inningDeliveries, d => d.total_runs);
-                const wickets = inningDeliveries.filter(d => d.player_dismissed).length;
-                
-                scorecardHTML += `<h4>Inning ${inningNum}: ${battingTeam} - ${totalRuns}/${wickets}</h4>`;
-                
-                const batsmenScores = d3.rollup(inningDeliveries, v => d3.sum(v, d => d.batsman_runs), d => d.batsman);
-                const sortedBatsmen = [...batsmenScores.entries()].sort((a,b) => d3.descending(a[1], b[1])).slice(0,3);
-
-                scorecardHTML += `<strong>Top Batsmen:</strong><ul>`;
-                sortedBatsmen.forEach(([batsman, runs]) => {
-                    scorecardHTML += `<li>${batsman}: ${runs}</li>`;
+                let cumulativeRuns = 0;
+                let ballCounter = 0;
+                const runProgression = inningDeliveries.map(d => {
+                    cumulativeRuns += d.total_runs;
+                    ballCounter++;
+                    if(cumulativeRuns > maxRuns) maxRuns = cumulativeRuns;
+                    return {
+                        ball: ballCounter,
+                        runs: cumulativeRuns,
+                        wicket: d.player_dismissed ? { player: d.player_dismissed, kind: d.dismissal_kind } : null
+                    };
                 });
-                scorecardHTML += `</ul>`;
+                inningsData.push({inning: inningNum, team: inningDeliveries[0].batting_team, progression: runProgression});
             });
 
-            scorecardContainer.html(scorecardHTML);
+            const x = d3.scaleLinear().domain([0, d3.max(inningsData, d => d.progression.length)]).range([0, chartWidth]);
+            svg.append("g").attr("transform", `translate(0, ${chartHeight})`).call(d3.axisBottom(x).ticks(20).tickFormat(d => Math.floor(d/6)));
+            svg.append("text").attr("text-anchor", "end").attr("x", chartWidth).attr("y", chartHeight + chartMargin.top + 5).text("Over");
+
+
+            const y = d3.scaleLinear().domain([0, maxRuns]).range([chartHeight, 0]);
+            svg.append("g").call(d3.axisLeft(y));
+            svg.append("text").attr("text-anchor", "end").attr("transform", "rotate(-90)").attr("y", -chartMargin.left+15).attr("x", -chartMargin.top).text("Cumulative Runs");
+
+
+            const color = d3.scaleOrdinal(d3.schemeCategory10);
+            
+            inningsData.forEach((inning, i) => {
+                const line = d3.line()
+                    .x(d => x(d.ball))
+                    .y(d => y(d.runs));
+
+                svg.append("path")
+                    .datum(inning.progression)
+                    .attr("class", "line")
+                    .attr("d", line)
+                    .style("stroke", color(i));
+
+                svg.selectAll(`.wicket-dot-inning-${i}`)
+                    .data(inning.progression.filter(d => d.wicket))
+                    .enter().append("circle")
+                    .attr("class", `wicket-dot wicket-dot-inning-${i}`)
+                    .attr("cx", d => x(d.ball))
+                    .attr("cy", d => y(d.runs))
+                    .on("mouseover", (event, d) => {
+                        tooltip.style("opacity", 1).html(`Wicket: ${d.wicket.player}<br>(${d.wicket.kind})`);
+                    })
+                    .on("mousemove", (event) => {
+                        const [posX, posY] = d3.pointer(event, d3.select('#visualization-container').node());
+                        tooltip.style("left", (posX + 15) + "px").style("top", (posY) + "px");
+                    })
+                    .on("mouseleave", () => tooltip.style("opacity", 0));
+                
+                // Legend
+                svg.append("circle").attr("cx",chartWidth - 100).attr("cy",10 + i*20).attr("r", 6).style("fill", color(i))
+                svg.append("text").attr("x", chartWidth - 80).attr("y", 10 + i*20).text(inning.team).style("font-size", "15px").attr("alignment-baseline","middle")
+            });
         }
 
     </script>
