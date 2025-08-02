@@ -422,9 +422,9 @@
             let scorecardHTML = `<h3>Scorecard: ${matchDetails.team1} vs ${matchDetails.team2}</h3><p><strong>Result:</strong> ${matchDetails.winner} won. <strong>Player of the Match:</strong> ${matchDetails.player_of_match}</p><hr>`;
             scorecardContainer.append("div").html(scorecardHTML);
 
-            const vizMargin = {top: 40, right: 160, bottom: 60, left: 50};
+            const vizMargin = {top: 100, right: 160, bottom: 60, left: 60};
             const vizWidth = 800 - vizMargin.left - vizMargin.right;
-            const vizHeight = 350 - vizMargin.top - vizMargin.bottom;
+            const vizHeight = 450 - vizMargin.top - vizMargin.bottom;
 
             const svg = scorecardContainer.append("svg")
                 .attr("width", vizWidth + vizMargin.left + vizMargin.right)
