@@ -6,12 +6,9 @@
     <title>IPL Data Narrative</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://rawgit.com/susielu/d3-annotation/master/d3-annotation.min.js"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: sans-serif; /* Generic font */
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -46,12 +43,12 @@
             font-size: 1.1rem;
         }
         h1 {
-            color: #1a2a6c;
+            color: #003366; /* Dark Blue */
             font-size: 2.5rem;
             margin-bottom: 1rem;
         }
         h2 {
-            color: #b21f1f;
+            color: #004080; /* Medium Blue */
             font-size: 1.8rem;
             margin-bottom: 2rem;
         }
@@ -59,7 +56,7 @@
             margin-top: 2rem;
         }
         button {
-            background-image: linear-gradient(to right, #1a2a6c 0%, #b21f1f 51%, #f64f59 100%);
+            background-image: linear-gradient(to right, #003366 0%, #0059b3 51%, #0073e6 100%); /* Blue gradient */
             margin: 10px;
             padding: 15px 30px;
             text-align: center;
@@ -256,7 +253,7 @@
                 .attr("y", d => y(0))
                 .attr("width", x.bandwidth())
                 .attr("height", 0)
-                .attr("fill", "#1a2a6c")
+                .attr("fill", "#0059b3") /* Blue color for bars */
                 .on("mouseover", mouseover)
                 .on("mousemove", mousemove)
                 .on("mouseleave", mouseleave)
@@ -264,7 +261,8 @@
                 .attr("y", d => y(d.matches))
                 .attr("height", d => height - y(d.matches));
             
-            // --- Annotation ---
+            /*
+            // --- Annotation Removed as requested ---
             const peakSeason = seasonData.reduce((prev, current) => (prev.matches > current.matches) ? prev : current);
             const type = d3.annotationLabel;
             const annotations = [{
@@ -277,6 +275,7 @@
 
             const makeAnnotations = d3.annotation().type(type).annotations(annotations);
             svg.append("g").attr("class", "annotation-group").call(makeAnnotations);
+            */
         }
 
         function scene3_TopWinningTeams() {
@@ -322,7 +321,7 @@
                 .attr("y", y(0))
                 .attr("width", x.bandwidth())
                 .attr("height", 0)
-                .attr("fill", "#b21f1f")
+                .attr("fill", "#0059b3") /* Blue color for bars */
                 .on("mouseover", mouseover)
                 .on("mousemove", mousemove)
                 .on("mouseleave", mouseleave)
@@ -330,19 +329,21 @@
                 .attr("y", d => y(d.wins))
                 .attr("height", d => height - y(d.wins));
 
-            // --- Annotation ---
+            /*
+            // --- Annotation Removed as requested ---
             const topTeam = teamData[0];
             const type = d3.annotationLabel; 
             const annotations = [{
                 note: { label: `${topTeam.team} leads with ${topTeam.wins} wins.`, title: "Top Team", wrap: 150 },
                 x: x(topTeam.team) + x.bandwidth() / 2,
                 y: y(topTeam.wins),
-                dy: -50, // Adjusted for visibility
-                dx: 0   // Adjusted for visibility
+                dy: -50,
+                dx: 0
             }];
 
             const makeAnnotations = d3.annotation().type(type).annotations(annotations);
             svg.append("g").attr("class", "annotation-group").call(makeAnnotations);
+            */
         }
 
     </script>
