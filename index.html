@@ -500,7 +500,7 @@
 
             const type = d3.annotationLabel;
             const annotations = finalScores.map((score, i) => ({
-                note: { label: `${score.runs}/${score.wickets}`, title: score.team, wrap: 150 },
+                note: { label: `${score.runs}/${score.wickets}`, title: score.team, wrap: 100 },
                 x: x(score.ball), y: y(score.runs), dy: i === 0 ? -30 : 30, dx: -30
             }));
 
