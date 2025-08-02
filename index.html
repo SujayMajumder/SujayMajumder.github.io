@@ -175,80 +175,94 @@
 
     <script>
         // --- Main Execution ---
-        let slideIndex = 0;
-        let slides = [];
-        let matchesData = [];
-        let deliveriesData = [];
+        let currentSlideIndex = 0;
+        let allSlides = [];
+        let iplMatchesData = [];
+        let iplDeliveriesData = [];
 
         // Chart dimensions
-        const margin = {top: 40, right: 30, bottom: 80, left: 60};
-        const width = 800 - margin.left - margin.right;
-        const height = 450 - margin.top - margin.bottom;
+        const chartMargin = {top: 40, right: 30, bottom: 80, left: 60};
+        const chartWidth = 800 - chartMargin.left - chartMargin.right;
+        const chartHeight = 450 - chartMargin.top - chartMargin.bottom;
 
         // Tooltip
         const tooltip = d3.select("#tooltip");
 
-        // --- Initialize Visualization by loading both external CSVs ---
+        // --- Data Loading ---
+        // Load both datasets before initializing the visualization
         Promise.all([
             d3.csv("matches.csv", d3.autoType),
             d3.csv("deliveries.csv", d3.autoType)
         ]).then(function([matches, deliveries]) {
-            matchesData = matches;
-            deliveriesData = deliveries;
-            console.log("Matches data loaded:", matchesData);
-            console.log("Deliveries data loaded:", deliveriesData);
-
-            slides = [
-                scene1_Intro,
-                scene2_MatchesPerSeason,
-                scene3_TopWinningTeams,
-                scene4_MatchExplorer
+            iplMatchesData = matches;
+            iplDeliveriesData = deliveries;
+            
+            // The slides (scenes) of our story
+            allSlides = [
+                renderIntroScene,
+                renderMatchesPerSeasonScene,
+                renderTopTeamsScene,
+                renderMatchExplorerScene
             ];
             
-            renderSlide();
+            // Start the story
+            renderCurrentSlide();
         }).catch(function(error) {
-            console.error("Error loading CSV files:", error);
+            console.error("Error loading the CSV files:", error);
             d3.select("#slide-content").html(`
                 <h1>Error</h1>
                 <p class="slide-text">Could not load datasets. Make sure 'matches.csv' and 'deliveries.csv' are in the same folder.</p>
             `);
         });
         
-        // --- Event Listeners ---
+        // --- Navigation Logic ---
         d3.select("#nextBtn").on("click", () => {
-            if (slideIndex < slides.length - 1) {
-                slideIndex++;
-                renderSlide();
+            if (currentSlideIndex < allSlides.length - 1) {
+                currentSlideIndex++;
+                renderCurrentSlide();
             }
         });
 
         d3.select("#prevBtn").on("click", () => {
-            if (slideIndex > 0) {
-                slideIndex--;
-                renderSlide();
+            if (currentSlideIndex > 0) {
+                currentSlideIndex--;
+                renderCurrentSlide();
             }
         });
 
-        // --- Core Functions ---
-        function renderSlide() {
-            const content = d3.select("#slide-content");
-            content.transition().duration(250).style("opacity", 0)
+        // --- Core Rendering Function ---
+        // This function handles the transition between scenes
+        function renderCurrentSlide() {
+            const slideContentArea = d3.select("#slide-content");
+            
+            // Fade out the current content
+            slideContentArea.transition().duration(250).style("opacity", 0)
                 .end().then(() => {
-                    content.html("");
-                    slides[slideIndex]();
-                    content.transition().duration(250).style("opacity", 1);
+                    // Clear the content and render the new slide
+                    slideContentArea.html("");
+                    allSlides[currentSlideIndex]();
+                    // Fade in the new content
+                    slideContentArea.transition().duration(250).style("opacity", 1);
                 });
 
-            d3.select("#prevBtn").property("disabled", slideIndex === 0);
-            d3.select("#nextBtn").property("disabled", slideIndex === slides.length - 1);
+            // Update the state of the navigation buttons
+            d3.select("#prevBtn").property("disabled", currentSlideIndex === 0);
+            d3.select("#nextBtn").property("disabled", currentSlideIndex === allSlides.length - 1);
         }
 
-        function wrap(text, width) {
+        // --- Utility for wrapping long text labels ---
+        function wrapText(text, width) {
             text.each(function() {
-                var text = d3.select(this),
-                    words = text.text().split(/\s+/).reverse(), word, line = [], lineNumber = 0,
-                    lineHeight = 1.1, y = text.attr("y"), dy = parseFloat(text.attr("dy")) || 0,
-                    tspan = text.text(null).append("tspan").attr("x", 0).attr("y", y).attr("dy", dy + "em");
+                let textElement = d3.select(this),
+                    words = textElement.text().split(/\s+/).reverse(),
+                    word,
+                    line = [],
+                    lineNumber = 0,
+                    lineHeight = 1.1, // ems
+                    y = textElement.attr("y"),
+                    dy = parseFloat(textElement.attr("dy")) || 0,
+                    tspan = textElement.text(null).append("tspan").attr("x", 0).attr("y", y).attr("dy", dy + "em");
+                
                 while (word = words.pop()) {
                     line.push(word);
                     tspan.text(line.join(" "));
@@ -256,15 +270,15 @@
                         line.pop();
                         tspan.text(line.join(" "));
                         line = [word];
-                        tspan = text.append("tspan").attr("x", 0).attr("y", y).attr("dy", ++lineNumber * lineHeight + dy + "em").text(word);
+                        tspan = textElement.append("tspan").attr("x", 0).attr("y", y).attr("dy", ++lineNumber * lineHeight + dy + "em").text(word);
                     }
                 }
             });
         }
         
-        // --- Slide Definitions ---
+        // --- Scene Definitions ---
 
-        function scene1_Intro() {
+        function renderIntroScene() {
             d3.select("#slide-content").html(`
                 <h1>A Narrative of the Indian Premier League (IPL)</h1>
                 <p class="slide-text">Welcome! This interactive slideshow explores key trends from the IPL, one of the world's most exciting cricket tournaments.</p>
@@ -272,88 +286,87 @@
             `);
         }
 
-        function scene2_MatchesPerSeason() {
+        function renderMatchesPerSeasonScene() {
             const content = d3.select("#slide-content");
             content.html(`
                 <h2>Matches Played Each Season</h2>
                 <p class="slide-text">The number of matches fluctuated per season, often reflecting changes in the tournament format. Hover over a bar to see the exact count.</p>
             `);
 
-            const matchesPerSeason = d3.rollup(matchesData, v => v.length, d => d.season);
+            const matchesPerSeason = d3.rollup(iplMatchesData, v => v.length, d => d.season);
             const seasonData = Array.from(matchesPerSeason, ([key, value]) => ({season: key, matches: value}))
                                   .sort((a, b) => d3.ascending(a.season, b.season));
             
-            const svg = content.append("svg").attr("width", width + margin.left + margin.right).attr("height", height + margin.top + margin.bottom)
-                .append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+            const svg = content.append("svg").attr("width", chartWidth + chartMargin.left + chartMargin.right).attr("height", chartHeight + chartMargin.top + chartMargin.bottom)
+                .append("g").attr("transform", `translate(${chartMargin.left},${chartMargin.top})`);
 
-            const x = d3.scaleBand().range([0, width]).domain(seasonData.map(d => d.season)).padding(0.2);
-            svg.append("g").attr("transform", `translate(0,${height})`).call(d3.axisBottom(x))
+            const x = d3.scaleBand().range([0, chartWidth]).domain(seasonData.map(d => d.season)).padding(0.2);
+            svg.append("g").attr("transform", `translate(0,${chartHeight})`).call(d3.axisBottom(x))
                .selectAll("text").attr("transform", "translate(-10,0)rotate(-45)").style("text-anchor", "end");
 
-            const y = d3.scaleLinear().domain([0, d3.max(seasonData, d => d.matches)]).range([height, 0]);
+            const y = d3.scaleLinear().domain([0, d3.max(seasonData, d => d.matches)]).range([chartHeight, 0]);
             svg.append("g").call(d3.axisLeft(y));
 
-            const mouseover = (event, d) => tooltip.style("opacity", 1);
-            const mousemove = (event, d) => {
-                const [posX, posY] = d3.pointer(event, d3.select('#visualization-container').node());
-                tooltip.html(`Season: ${d.season}<br>Matches: ${d.matches}`).style("left", (posX + 15) + "px").style("top", (posY) + "px");
-            };
-            const mouseleave = () => tooltip.style("opacity", 0);
-
-            svg.selectAll("rect").data(seasonData).join("rect").attr("class", "bar").attr("x", d => x(d.season))
-                .attr("y", y(0)).attr("width", x.bandwidth()).attr("height", 0).attr("fill", "#0059b3")
-                .on("mouseover", mouseover).on("mousemove", mousemove).on("mouseleave", mouseleave)
-                .transition().duration(800).attr("y", d => y(d.matches)).attr("height", d => height - y(d.matches));
+            svg.selectAll(".bar").data(seasonData).join("rect").attr("class", "bar")
+                .attr("x", d => x(d.season)).attr("y", y(0))
+                .attr("width", x.bandwidth()).attr("height", 0)
+                .attr("fill", "#0059b3")
+                .on("mouseover", (event, d) => tooltip.style("opacity", 1))
+                .on("mousemove", (event, d) => {
+                    const [posX, posY] = d3.pointer(event, d3.select('#visualization-container').node());
+                    tooltip.html(`Season: ${d.season}<br>Matches: ${d.matches}`).style("left", (posX + 15) + "px").style("top", (posY) + "px");
+                })
+                .on("mouseleave", () => tooltip.style("opacity", 0))
+                .transition().duration(800).attr("y", d => y(d.matches)).attr("height", d => chartHeight - y(d.matches));
         }
 
-        function scene3_TopWinningTeams() {
+        function renderTopTeamsScene() {
             const content = d3.select("#slide-content");
             content.html(`
                 <h2>Top 5 Most Dominant Teams</h2>
                 <p class="slide-text">Winning is everything. This chart reveals the top 5 teams with the most victories. Hover over a bar to see the exact win count and titles won.</p>
             `);
 
-            const finalMatchesBySeason = d3.rollup(matchesData, v => d3.max(v, d => d.id), d => d.season);
+            const finalMatchesBySeason = d3.rollup(iplMatchesData, v => d3.max(v, d => d.id), d => d.season);
             const championshipWinners = new Map();
             finalMatchesBySeason.forEach(matchId => {
-                const finalMatch = matchesData.find(d => d.id === matchId);
+                const finalMatch = iplMatchesData.find(d => d.id === matchId);
                 if (finalMatch && finalMatch.winner) {
                     championshipWinners.set(finalMatch.winner, (championshipWinners.get(finalMatch.winner) || 0) + 1);
                 }
             });
 
-            const winsPerTeam = d3.rollup(matchesData, v => v.length, d => d.winner);
+            const winsPerTeam = d3.rollup(iplMatchesData, v => v.length, d => d.winner);
             winsPerTeam.delete(""); winsPerTeam.delete(null);
             
             const teamData = Array.from(winsPerTeam, ([key, value]) => ({
                 team: key, wins: value, championships: championshipWinners.get(key) || 0
             })).sort((a, b) => d3.descending(a.wins, b.wins)).slice(0, 5);
             
-            const svg = content.append("svg").attr("width", width + margin.left + margin.right).attr("height", height + margin.top + margin.bottom)
-                .append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+            const svg = content.append("svg").attr("width", chartWidth + chartMargin.left + chartMargin.right).attr("height", chartHeight + chartMargin.top + chartMargin.bottom)
+                .append("g").attr("transform", `translate(${chartMargin.left},${chartMargin.top})`);
 
-            const x = d3.scaleBand().range([0, width]).domain(teamData.map(d => d.team)).padding(0.2);
-            svg.append("g").attr("transform", `translate(0,${height})`).call(d3.axisBottom(x))
-               .selectAll(".tick text").call(wrap, x.bandwidth());
+            const x = d3.scaleBand().range([0, chartWidth]).domain(teamData.map(d => d.team)).padding(0.2);
+            svg.append("g").attr("transform", `translate(0,${chartHeight})`).call(d3.axisBottom(x))
+               .selectAll(".tick text").call(wrapText, x.bandwidth());
 
-            const y = d3.scaleLinear().domain([0, d3.max(teamData, d => d.wins)]).range([height, 0]);
+            const y = d3.scaleLinear().domain([0, d3.max(teamData, d => d.wins)]).range([chartHeight, 0]);
             svg.append("g").call(d3.axisLeft(y));
 
-            const mouseover = (event, d) => tooltip.style("opacity", 1);
-            const mousemove = (event, d) => {
-                const [posX, posY] = d3.pointer(event, d3.select('#visualization-container').node());
-                tooltip.html(`${d.team}<br>Total Wins: ${d.wins}<br>IPL Titles: ${d.championships}`).style("left", (posX + 15) + "px").style("top", (posY) + "px");
-            };
-            const mouseleave = () => tooltip.style("opacity", 0);
-
-            svg.selectAll("rect").data(teamData).join("rect").attr("class", "bar").attr("x", d => x(d.team))
-                .attr("y", y(0)).attr("width", x.bandwidth()).attr("height", 0)
-                .attr("fill", "#0059b3") // Reverted to single color
-                .on("mouseover", mouseover).on("mousemove", mousemove).on("mouseleave", mouseleave)
-                .transition().duration(800).attr("y", d => y(d.wins)).attr("height", d => height - y(d.wins));
+            svg.selectAll(".bar").data(teamData).join("rect").attr("class", "bar")
+                .attr("x", d => x(d.team)).attr("y", y(0))
+                .attr("width", x.bandwidth()).attr("height", 0)
+                .attr("fill", "#0059b3")
+                .on("mouseover", (event, d) => tooltip.style("opacity", 1))
+                .on("mousemove", (event, d) => {
+                    const [posX, posY] = d3.pointer(event, d3.select('#visualization-container').node());
+                    tooltip.html(`${d.team}<br>Total Wins: ${d.wins}<br>IPL Titles: ${d.championships}`).style("left", (posX + 15) + "px").style("top", (posY) + "px");
+                })
+                .on("mouseleave", () => tooltip.style("opacity", 0))
+                .transition().duration(800).attr("y", d => y(d.wins)).attr("height", d => chartHeight - y(d.wins));
         }
 
-        function scene4_MatchExplorer() {
+        function renderMatchExplorerScene() {
             const content = d3.select("#slide-content");
             content.html(`
                 <h2>Match Explorer</h2>
@@ -366,7 +379,7 @@
                 <div id="scorecard-container"></div>
             `);
 
-            const seasons = [...new Set(matchesData.map(d => d.season))].sort(d3.descending);
+            const seasons = [...new Set(iplMatchesData.map(d => d.season))].sort(d3.descending);
             const yearSelect = d3.select("#year-select");
             yearSelect.selectAll("option.year-option").data(seasons).enter().append("option").attr("class", "year-option").text(d => d);
 
@@ -381,7 +394,7 @@
                     return;
                 }
                 const teamsInSeason = new Set();
-                matchesData.filter(d => d.season == selectedYear).forEach(d => { teamsInSeason.add(d.team1); teamsInSeason.add(d.team2); });
+                iplMatchesData.filter(d => d.season == selectedYear).forEach(d => { teamsInSeason.add(d.team1); teamsInSeason.add(d.team2); });
                 teamSelect.property("disabled", false).html("<option>Select a Team</option>").selectAll("option.team-option")
                     .data([...teamsInSeason].sort()).enter().append("option").attr("class", "team-option").text(d => d);
             });
@@ -394,7 +407,7 @@
 
                 if (!selectedTeam || selectedTeam === "Select a Team") { matchListContainer.html(""); return; }
 
-                const teamMatches = matchesData.filter(d => d.season == selectedYear && (d.team1 === selectedTeam || d.team2 === selectedTeam));
+                const teamMatches = iplMatchesData.filter(d => d.season == selectedYear && (d.team1 === selectedTeam || d.team2 === selectedTeam));
                 matchListContainer.selectAll("div.match-item").data(teamMatches).join("div").attr("class", "match-item")
                     .html(d => `${d.team1} vs ${d.team2} <br><small>${d.winner} won by ${d.win_by_runs > 0 ? `${d.win_by_runs} runs` : `${d.win_by_wickets} wickets`}</small>`)
                     .on("click", (event, d) => displayScorecard(d.id));
@@ -403,21 +416,21 @@
 
         function displayScorecard(matchId) {
             const scorecardContainer = d3.select("#scorecard-container").html("");
-            const matchDetails = matchesData.find(d => d.id === matchId);
-            const matchDeliveries = deliveriesData.filter(d => d.match_id === matchId);
+            const matchDetails = iplMatchesData.find(d => d.id === matchId);
+            const matchDeliveries = iplDeliveriesData.filter(d => d.match_id === matchId);
 
             let scorecardHTML = `<h3>Scorecard: ${matchDetails.team1} vs ${matchDetails.team2}</h3><p><strong>Result:</strong> ${matchDetails.winner} won. <strong>Player of the Match:</strong> ${matchDetails.player_of_match}</p><hr>`;
             scorecardContainer.append("div").html(scorecardHTML);
 
-            const chartMargin = {top: 40, right: 120, bottom: 40, left: 50};
-            const chartWidth = 800 - chartMargin.left - chartMargin.right;
-            const chartHeight = 350 - chartMargin.top - chartMargin.bottom;
+            const vizMargin = {top: 20, right: 120, bottom: 60, left: 50};
+            const vizWidth = 800 - vizMargin.left - vizMargin.right;
+            const vizHeight = 350 - vizMargin.top - vizMargin.bottom;
 
             const svg = scorecardContainer.append("svg")
-                .attr("width", chartWidth + chartMargin.left + chartMargin.right)
-                .attr("height", chartHeight + chartMargin.top + chartMargin.bottom)
+                .attr("width", vizWidth + vizMargin.left + vizMargin.right)
+                .attr("height", vizHeight + vizMargin.top + vizMargin.bottom)
                 .append("g")
-                .attr("transform", `translate(${chartMargin.left},${chartMargin.top})`);
+                .attr("transform", `translate(${vizMargin.left},${vizMargin.top})`);
 
             const inningsData = [];
             const innings = d3.group(matchDeliveries, d => d.inning);
@@ -425,9 +438,7 @@
             let finalScores = [];
 
             innings.forEach((inningDeliveries, inningNum) => {
-                let cumulativeRuns = 0;
-                let ballCounter = 0;
-                let wicketCounter = 0;
+                let cumulativeRuns = 0, ballCounter = 0, wicketCounter = 0;
                 const runProgression = inningDeliveries.map(d => {
                     cumulativeRuns += d.total_runs;
                     ballCounter++;
@@ -440,39 +451,28 @@
                 inningsData.push({inning: inningNum, team: inningDeliveries[0].batting_team, progression: runProgression});
             });
 
-            const x = d3.scaleLinear().domain([0, d3.max(inningsData, d => d.progression.length)]).range([0, chartWidth]);
-            svg.append("g").attr("transform", `translate(0, ${chartHeight})`).call(d3.axisBottom(x).ticks(10).tickFormat(d => Math.floor(d/6)));
-            svg.append("text").attr("class", "axis-label").attr("text-anchor", "middle").attr("x", chartWidth / 2).attr("y", chartHeight + chartMargin.bottom - 5).text("Over");
+            const x = d3.scaleLinear().domain([0, d3.max(inningsData, d => d.progression.length)]).range([0, vizWidth]);
+            svg.append("g").attr("transform", `translate(0, ${vizHeight})`).call(d3.axisBottom(x).ticks(10).tickFormat(d => Math.floor(d/6)));
+            svg.append("text").attr("class", "axis-label").attr("text-anchor", "middle").attr("x", vizWidth / 2).attr("y", vizHeight + vizMargin.bottom - 20).text("Over");
             
-            const y = d3.scaleLinear().domain([0, maxRuns * 1.1]).range([chartHeight, 0]);
+            const y = d3.scaleLinear().domain([0, maxRuns * 1.1]).range([vizHeight, 0]);
             svg.append("g").call(d3.axisLeft(y));
-            svg.append("text").attr("class", "axis-label").attr("text-anchor", "middle").attr("transform", "rotate(-90)").attr("y", -chartMargin.left + 20).attr("x", -chartHeight / 2).text("Runs");
+            svg.append("text").attr("class", "axis-label").attr("text-anchor", "middle").attr("transform", "rotate(-90)").attr("y", -vizMargin.left + 20).attr("x", -vizHeight / 2).text("Runs");
 
             const color = d3.scaleOrdinal(d3.schemeCategory10);
             
             const legendGroup = svg.append("g")
                 .attr("class", "legend")
-                .attr("transform", "translate(10, 0)");
+                .attr("transform", `translate(${vizWidth + 20}, 20)`);
 
             const legendItems = legendGroup.selectAll(".legend-item")
                 .data(inningsData)
                 .join("g")
                 .attr("class", "legend-item")
-                .attr("transform", (d, i) => `translate(0, ${i * 40})`); // Use fixed offset to prevent overlap
+                .attr("transform", (d, i) => `translate(0, ${i * 25})`);
 
-            legendItems.append("circle")
-                .attr("cx", 0)
-                .attr("cy", 10)
-                .attr("r", 6)
-                .style("fill", (d, i) => color(i));
-
-            legendItems.append("text")
-                .attr("x", 10)
-                .attr("y", 10)
-                .text(d => d.team)
-                .style("font-size", "12px")
-                .attr("alignment-baseline", "middle")
-                .call(wrap, 100);
+            legendItems.append("circle").attr("cx", 0).attr("cy", 0).attr("r", 6).style("fill", (d, i) => color(i));
+            legendItems.append("text").attr("x", 10).attr("y", 0).text(d => d.team).style("font-size", "12px").attr("alignment-baseline", "middle");
 
             inningsData.forEach((inning, i) => {
                 const line = d3.line().x(d => x(d.ball)).y(d => y(d.runs));
