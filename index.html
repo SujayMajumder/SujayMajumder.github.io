@@ -422,7 +422,7 @@
             let scorecardHTML = `<h3>Scorecard: ${matchDetails.team1} vs ${matchDetails.team2}</h3><p><strong>Result:</strong> ${matchDetails.winner} won. <strong>Player of the Match:</strong> ${matchDetails.player_of_match}</p><hr>`;
             scorecardContainer.append("div").html(scorecardHTML);
 
-            const vizMargin = {top: 20, right: 120, bottom: 60, left: 50};
+            const vizMargin = {top: 20, right: 140, bottom: 60, left: 50};
             const vizWidth = 800 - vizMargin.left - vizMargin.right;
             const vizHeight = 350 - vizMargin.top - vizMargin.bottom;
 
@@ -451,8 +451,8 @@
                 inningsData.push({inning: inningNum, team: inningDeliveries[0].batting_team, progression: runProgression});
             });
 
-            const x = d3.scaleLinear().domain([0, d3.max(inningsData, d => d.progression.length)]).range([0, vizWidth]);
-            svg.append("g").attr("transform", `translate(0, ${vizHeight})`).call(d3.axisBottom(x).ticks(10).tickFormat(d => Math.floor(d/6)));
+            const x = d3.scaleLinear().domain([0, 120]).range([0, vizWidth]); // 120 balls = 20 overs
+            svg.append("g").attr("transform", `translate(0, ${vizHeight})`).call(d3.axisBottom(x).ticks(10).tickFormat(d => d/6));
             svg.append("text").attr("class", "axis-label").attr("text-anchor", "middle").attr("x", vizWidth / 2).attr("y", vizHeight + vizMargin.bottom - 20).text("Over");
             
             const y = d3.scaleLinear().domain([0, maxRuns * 1.1]).range([vizHeight, 0]);
@@ -468,11 +468,17 @@
             const legendItems = legendGroup.selectAll(".legend-item")
                 .data(inningsData)
                 .join("g")
-                .attr("class", "legend-item")
-                .attr("transform", (d, i) => `translate(0, ${i * 25})`);
+                .attr("class", "legend-item");
 
             legendItems.append("circle").attr("cx", 0).attr("cy", 0).attr("r", 6).style("fill", (d, i) => color(i));
-            legendItems.append("text").attr("x", 10).attr("y", 0).text(d => d.team).style("font-size", "12px").attr("alignment-baseline", "middle");
+            legendItems.append("text").attr("x", 10).attr("y", 0).text(d => d.team).style("font-size", "12px").attr("alignment-baseline", "middle").call(wrapText, 100);
+            
+            let yOffset = 0;
+            legendItems.each(function() {
+                const g = d3.select(this);
+                g.attr("transform", `translate(0, ${yOffset})`);
+                yOffset += g.node().getBBox().height + 5;
+            });
 
             inningsData.forEach((inning, i) => {
                 const line = d3.line().x(d => x(d.ball)).y(d => y(d.runs));
@@ -495,7 +501,7 @@
             const type = d3.annotationLabel;
             const annotations = finalScores.map((score, i) => ({
                 note: { label: `${score.runs}/${score.wickets}`, title: score.team, wrap: 150 },
-                x: x(score.ball), y: y(score.runs), dy: i === 0 ? -30 : 30, dx: -30
+                x: x(score.ball), y: y(score.runs), dy: i === 0 ? -30 : 30, dx: 0
             }));
 
             const makeAnnotations = d3.annotation().type(type).annotations(annotations);
