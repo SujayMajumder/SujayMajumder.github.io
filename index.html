@@ -435,11 +435,12 @@
             });
 
             const x = d3.scaleLinear().domain([0, d3.max(inningsData, d => d.progression.length)]).range([0, chartWidth]);
-            svg.append("g").attr("transform", `translate(0, ${chartHeight})`).call(d3.axisBottom(x).ticks(10).tickFormat(d => `Over ${Math.floor(d/6)}`));
+            svg.append("g").attr("transform", `translate(0, ${chartHeight})`).call(d3.axisBottom(x).ticks(10).tickFormat(d => Math.floor(d/6)));
+            svg.append("text").attr("text-anchor", "end").attr("x", chartWidth).attr("y", chartHeight + chartMargin.bottom - 10).text("Over");
             
             const y = d3.scaleLinear().domain([0, maxRuns * 1.1]).range([chartHeight, 0]); // Add padding to y-axis
             svg.append("g").call(d3.axisLeft(y));
-            svg.append("text").attr("text-anchor", "middle").attr("transform", "rotate(-90)").attr("y", -chartMargin.left+15).attr("x", -chartHeight/2).text("Cumulative Runs");
+            svg.append("text").attr("text-anchor", "middle").attr("transform", "rotate(-90)").attr("y", -chartMargin.left+15).attr("x", -chartHeight/2).text("Runs");
 
 
             const color = d3.scaleOrdinal(d3.schemeCategory10);
@@ -471,8 +472,8 @@
                     .on("mouseleave", () => tooltip.style("opacity", 0));
                 
                 // Legend
-                svg.append("circle").attr("cx",chartWidth + 10).attr("cy",10 + i*20).attr("r", 6).style("fill", color(i))
-                svg.append("text").attr("x", chartWidth + 20).attr("y", 10 + i*20).text(inning.team).style("font-size", "15px").attr("alignment-baseline","middle")
+                svg.append("circle").attr("cx", 10).attr("cy",10 + i*20).attr("r", 6).style("fill", color(i))
+                svg.append("text").attr("x", 20).attr("y", 10 + i*20).text(inning.team).style("font-size", "15px").attr("alignment-baseline","middle")
             });
 
             // --- Final Score Annotations ---
